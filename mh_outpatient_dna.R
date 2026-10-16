@@ -1,4 +1,6 @@
 
+# Crib Sheet: https://publichealthscotland.scot/media/24924/2026-08-smr-crib-sheet-smr00-final.pdf
+
 # DNA Rate for MH Outpatient appointments ---------------------------------
 
 
@@ -16,6 +18,7 @@ library(knitr)
 library(kableExtra)
 library(scales)
 library(phstemplates)
+
 
 
 # Lookups -----------------------------------------------------------------
