@@ -45,11 +45,26 @@ smr00_test <- dbGetQuery(
     FROM ANALYSIS.SMR00_PI
     WHERE CLINIC_DATE >= ADD_MONTHS(SYSDATE, -12)
     AND GP_PRACTICE_CODE IN (' 16211', '16211') 
-    AND ROWNUM <= 10
+    AND ROWNUM <= 500
   "
 )
 
 
+
+# Referral Source, 1 = GP
+# Specialities:
+    # "G1",   # General Psychiatry
+    # "G1A",  # Community Psychiatry
+    # "G2",   # Child & Adolescent Psychiatry
+    # "G21",  # Child Psychiatry
+    # "G22",  # Adolescent Psychiatry
+    # "G3",   # Forensic Psychiatry
+    # "G4",   # Psychiatry of Old Age
+    # "G5",   # Learning Disability
+    # "G6",   # Psychotherapy
+    # "G61",  # Behavioural Psychotherapy
+    # "G62",  # Child & Adolescent Psychotherapy
+    # "G63"   # Adult Psychotherapy
 
 mh_appointments <- dbGetQuery(
   channel,
@@ -58,35 +73,60 @@ mh_appointments <- dbGetQuery(
       GP_PRACTICE_CODE,
       CLINIC_DATE,
       REFERRAL_SOURCE,
-      SPECIALTY
+      SPECIALTY,
+      CLINIC_ATTENDANCE
     FROM ANALYSIS.SMR00_PI
-    WHERE CLINIC_DATE >= ADD_MONTHS(SYSDATE, -12)
-    AND GP_PRACTICE_CODE IN (' 16211', '16211') 
-    AND ROWNUM <= 10
+    WHERE CLINIC_DATE >= TO_DATE('01/04/2024', 'DD/MM/YYYY')
+      AND GP_PRACTICE_CODE IN (' 16211', '16211') 
+      AND REFERRAL_SOURCE = '1'
+      AND SPECIALTY IN (
+        'G1',
+        'G1A',
+        'G2', 
+        'G21',
+        'G22',
+        'G3', 
+        'G4', 
+        'G5', 
+        'G6', 
+        'G61',
+        'G62',
+        'G63'
+      )
   "
 )
 
+clinic_attendance_codes <- mh_appointments |> 
+  clean_names() |> 
+  distinct(clinic_attendance)
 
 # Wrangle -----------------------------------------------------------------
 
+# For details of SMR00 data definitions see: https://publichealthscotland.scot/resources-and-tools/health-intelligence-and-data-management/national-data-catalogue/data-dictionary/search-the-data-dictionary/attendance-status/?Search=A&ID=96&Title=Attendance%20Status
+# Attendance Status
+# 1	Patient was seen
+# 5	Patient attended but was not seen (Could Not Wait - CNW)
+# 8	Patient did not attend and gave no prior warning (Did Not Attend - DNA)
+
+
 dna_summary <- mh_appointments %>%
-  group_by(GP_PRACTICE_CODE) %>%
-  summarise(
-    Total_Appointments = n(),
-    DNA_Count = sum(ATTENDANCE_STATUS == "DNA_CODE", na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    DNA_Percent = round(
-      DNA_Count / Total_Appointments * 100,
-      1
-    )
-  ) %>%
-  arrange(desc(DNA_Percent))
+  clean_names() |> 
+  group_by(gp_practice_code) %>%
+  summarise(total_appointments = n(),
+            dna_count = sum(clinic_attendance == 8, na.rm = TRUE),
+            .groups = "drop") %>%
+  mutate(dna_percent = percent(dna_count / total_appointments, .1)) %>%
+  arrange(desc(dna_percent))
 
 
 
 # Charts ------------------------------------------------------------------
 
 
+
+
+# Markdown Rendering ----------------------------------------------------------------
+
+# render_markdown("mh_op_dna_markdown.Rmd",
+#                 "//conf/LIST_analytics/Lothian/Midlothian/Missingness/Tweed/Mental Health Outpatient Appointment Rate.html")
 
