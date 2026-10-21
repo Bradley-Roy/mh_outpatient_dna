@@ -18,13 +18,44 @@ library(knitr)
 library(kableExtra)
 library(scales)
 library(phstemplates)
+library(phslookups)
+library(purrr)
 
 
+
+# Functions ---------------------------------------------------------------
+
+tabs <- function(plots, names){
+  do.call(
+    navset_pill,
+    pmap(
+      plots, names,
+      \(plot, name){
+        if(inherits(plot, "ggplot")) plot <- ggiraph::girafe(plot)
+        nav_panel(name, plot)
+      }
+    )
+  )
+}
 
 # Lookups -----------------------------------------------------------------
 
 prac_names <- read_csv("https://www.opendata.nhs.scot/dataset/f23655c3-6e23-4103-a511-a80d998adb90/resource/0032ce94-f7f6-44dd-879c-7d3074d8e2e8/download/practice_contact_details_20260701_opendata.csv")
 
+simd_lookup <- get_simd_postcode() |> 
+  select(
+    pc8,
+    simd2020v2_sc_decile,
+    simd2020v2_sc_quintile
+  ) |> 
+  rename(postcode = pc8,
+         simd_decile = simd2020v2_sc_decile,
+         simd_quintile = simd2020v2_sc_quintile)
+
+# simd_lookup <- get_simd_postcode(
+#   postcode_version = "latest",
+#   simd_version = "2020v2"
+# )
 
 
 # Extraction --------------------------------------------------------------
@@ -77,7 +108,8 @@ mh_appointments <- dbGetQuery(
       CLINIC_DATE,
       REFERRAL_SOURCE,
       SPECIALTY,
-      CLINIC_ATTENDANCE
+      CLINIC_ATTENDANCE,
+      POSTCODE
     FROM ANALYSIS.SMR00_PI
     WHERE CLINIC_DATE >= TO_DATE('01/04/2024', 'DD/MM/YYYY')
       AND GP_PRACTICE_CODE IN (' 16211', '16211') 
@@ -111,25 +143,59 @@ clinic_attendance_codes <- mh_appointments |>
 # 5	Patient attended but was not seen (Could Not Wait - CNW)
 # 8	Patient did not attend and gave no prior warning (Did Not Attend - DNA)
 
-
-dna_summary <- mh_appointments %>%
+mh_appointments_simd <- mh_appointments |> 
   clean_names() |> 
+  left_join(
+    simd_lookup,
+    by = "postcode"
+  ) |> 
+  mutate(date_year = year(clinic_date))
+
+dna_summary <- mh_appointments_simd %>%
   group_by(gp_practice_code) %>%
   summarise(total_appointments = n(),
             dna_count = sum(clinic_attendance == 8, na.rm = TRUE),
             .groups = "drop") %>%
   mutate(dna_percent = percent(dna_count / total_appointments, .1)) %>%
-  arrange(desc(dna_percent))
+  arrange(desc(dna_percent)) 
 
 
+spec_simd_summary <- mh_appointments_simd %>%
+  group_by(date_year, gp_practice_code, specialty, simd_quintile) %>%
+  summarise(total_appointments = n(),
+            dna_count = sum(clinic_attendance == 8, na.rm = TRUE),
+            .groups = "drop") %>%
+  mutate(dna_percent = percent(dna_count / total_appointments, .1)) %>%
+  arrange(desc(dna_percent)) 
+
+#test table to check formatting
+spec_simd_summary_pivot <- spec_simd_summary |> 
+  filter(specialty == "G1") |> 
+  select(date_year, simd_quintile, dna_percent) |> 
+  pivot_wider(names_from = date_year, values_from = dna_percent) |> 
+  arrange(simd_quintile)
 
 # Charts ------------------------------------------------------------------
 
+create_spec_table <- function(spec) {
+  
+  spec_simd_summary |>
+    filter(specialty == spec) |>
+    select(date_year, simd_quintile, dna_percent) |>
+    pivot_wider(
+      names_from = date_year,
+      values_from = dna_percent
+    ) |>
+    arrange(simd_quintile)
+}
 
+spec_tables <- unique(spec_simd_summary$specialty) |>
+  set_names() |>
+  map(create_spec_table)
 
 
 # Markdown Rendering ----------------------------------------------------------------
 
-# render_markdown("mh_op_dna_markdown.Rmd",
-#                 "//conf/LIST_analytics/Lothian/Midlothian/Missingness/Tweed/Mental Health Outpatient Appointment Rate.html")
+render_markdown("mh_op_dna_markdown.Rmd",
+                "//conf/LIST_analytics/Lothian/Midlothian/Missingness/Tweed/Mental Health Outpatient Appointment Rate.html")
 
