@@ -1,32 +1,57 @@
 ---
 title: "Outpatient DNA Rate"
-output: html_document
 date: "`r ymd(today())`"
+output:
+  html_document:
+    theme: default
 ---
+
+
+```{r include=FALSE}
+
+
+shared_data <- SharedData$new(all_specialties_chart)
+
+```
+
+
+
+
 
 The following document shows the outpatient DNA rate for The Tweed. 
 
 Source:
 Period of interest:
 
-## Number of Appointments
+## Number of Appointments by Specialty, 2023-2025 Calendar Years
+```{r, echo=FALSE}
 
-```{r cars}
-summary(cars)
+all_specialties_chart
+
+```
+
+## Percentage of DNAs by Specialty, 2023-2025 Calendar Years
+```{r, echo=FALSE}
+
+all_specialties_dna_chart
+
 ```
 
 
-## Number of DNAs
+## Number and Rate of DNAs by SIMD and Year 
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r, echo=FALSE}
+
+all_spec_simd_pivot |> 
+  clean_names("title") |> 
+  kable()
 ```
 
 
 ## DNA Rate
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r, echo=FALSE}
+# plot(pressure)
 ```
 
 
