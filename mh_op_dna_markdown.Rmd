@@ -1,32 +1,102 @@
 ---
 title: "Outpatient DNA Rate"
-output: html_document
-date: "`r ymd(today())`"
+# date: "`r ymd(today())`"
+output:
+  html_document:
+    theme: default
 ---
+
+
+```{r include=FALSE}
+
+
+# shared_data <- SharedData$new(all_spec_simd_pivot,
+#                               # key = "specialty",
+#                               group = ~specialty_description)
+
+all_spec_simd_pivot2 <- all_spec_simd_pivot |>
+  mutate(row_id = row_number(),
+         `Specialty Description` = factor(`Specialty Description`))
+
+shared_data <- SharedData$new(
+  all_spec_simd_pivot2,
+  key = ~row_id,
+  group = "appointments"
+)
+
+```
+
+
+
+## Background
 
 The following document shows the outpatient DNA rate for The Tweed. 
 
-Source:
-Period of interest:
+Source: SMR00 (Outpatients), Public Health Scotland
 
-## Number of Appointments
+Date of extraction: `r pretty_date(today())`
 
-```{r cars}
-summary(cars)
+Period of interest: January 2023 to December 2025 [Inclusive]
+
+Codes selected for the Mental Health grouping: `r select_specialties`
+
+
+## Appointments by Specialty, 2023-2025 Calendar Years {.tabset .tabset-fade}
+
+### Number of Appointments
+```{r, echo=FALSE, fig.height=8}
+
+all_specialties_chart
+
+```
+
+### Number of DNAs
+```{r, echo=FALSE, fig.height=8}
+
+all_specialties_dna_chart
+
+```
+
+### Percentage of DNAs
+```{r, echo=FALSE, fig.height=8}
+
+all_specialties_dnaper_chart
+
 ```
 
 
-## Number of DNAs
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
 
 
-## DNA Rate
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+
+## DNA Rate Table - SIMD and Year
+
+```{r, echo=FALSE}
+
+filter_select(
+  id = "specialty_filter",
+  label = "Select Specialty",
+  sharedData = shared_data,
+  group = all_spec_simd_pivot2$`Specialty Description`
+)
+
+# Create table using the SharedData object
+datatable(
+  shared_data,
+  rownames = FALSE,
+  filter = "top",
+  options = list(
+    # pageLength = 10,
+    scrollX = TRUE,
+    columnDefs = list(
+      list(
+        targets = 5,
+        visible = FALSE
+      )
+    )
+  )
+)
+
 ```
 
 
